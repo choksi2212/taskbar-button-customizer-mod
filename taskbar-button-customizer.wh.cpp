@@ -639,6 +639,8 @@ static void RestoreAllButtons() noexcept {
 // Receives Add/Remove events for every XAML element in the process.
 // When we see a TaskListButton element added, we capture it and apply settings.
 
+void RequestRefresh() noexcept;
+
 class VisualTreeWatcher
     : public winrt::implements<VisualTreeWatcher,
                                IVisualTreeServiceCallback2,
@@ -657,16 +659,15 @@ public:
                 bool isBtn = typeName.ends_with(L"TaskListButton") ||
                              typeName.ends_with(L"TaskListLabeledButtonPanel");
                 if (isBtn) {
-                    // InstanceHandle is the raw IInspectable* cast to uint64.
-                    // winrt::from_abi converts it back to a typed WinRT object.
-                    auto raw = reinterpret_cast<winrt::Windows::UI::Xaml::DependencyObject*>(
-                        reinterpret_cast<void*>(static_cast<uintptr_t>(element.Handle)));
-                    if (raw && *raw) {
-                        auto btn = *raw;
+                    // Safe conversion from raw COM pointer to C++/WinRT projection
+                    winrt::Windows::UI::Xaml::DependencyObject btn = nullptr;
+                    winrt::copy_from_abi(btn, reinterpret_cast<void*>(static_cast<uintptr_t>(element.Handle)));
+                    if (btn) {
                         StoreButton(btn);
-                        ModSettings s = LoadAndApply();
-                        ApplyToButtonSubtree(btn, s);
-                        LOG_INFO(L"[Watcher] Applied to new %ls", element.Type);
+                        LOG_INFO(L"[Watcher] New %ls added (stored count: %zu), scheduling UI-thread refresh", 
+                                 element.Type, g_discoveredButtons.size());
+                        // Marshal styling to the main UI thread to prevent RPC_E_WRONG_THREAD crash
+                        RequestRefresh();
                     }
                 }
             } else if (mutationType == Remove && element.Type) {
@@ -674,15 +675,16 @@ public:
                 bool isBtn = typeName.ends_with(L"TaskListButton") ||
                              typeName.ends_with(L"TaskListLabeledButtonPanel");
                 if (isBtn) {
-                    // Element removed: prune from our list
-                    auto raw = reinterpret_cast<DependencyObject*>(
-                        reinterpret_cast<void*>(static_cast<uintptr_t>(element.Handle)));
-                    if (raw && *raw) {
+                    winrt::Windows::UI::Xaml::DependencyObject btn = nullptr;
+                    winrt::copy_from_abi(btn, reinterpret_cast<void*>(static_cast<uintptr_t>(element.Handle)));
+                    if (btn) {
                         std::lock_guard<std::mutex> lk(g_buttonsMtx);
                         auto it = std::find(g_discoveredButtons.begin(),
-                                            g_discoveredButtons.end(), *raw);
-                        if (it != g_discoveredButtons.end())
+                                            g_discoveredButtons.end(), btn);
+                        if (it != g_discoveredButtons.end()) {
                             g_discoveredButtons.erase(it);
+                            LOG_INFO(L"[Watcher] %ls removed, stored count: %zu", element.Type, g_discoveredButtons.size());
+                        }
                     }
                 }
             }
