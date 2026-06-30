@@ -686,9 +686,12 @@ public:
         return S_OK;
     }
 
-    // IVisualTreeServiceCallback2
+    // IVisualTreeServiceCallback2 — exact signature from xamlom.h line 286:
+    //   OnElementStateChanged(InstanceHandle, VisualElementState, LPCWSTR)
     HRESULT STDMETHODCALLTYPE OnElementStateChanged(
-        InstanceHandle, BSTR, BSTR) noexcept override { return S_OK; }
+        InstanceHandle    /* element */,
+        VisualElementState /* elementState */,
+        LPCWSTR           /* context */) noexcept override { return S_OK; }
 };
 
 // ── Background diagnostics thread ─────────────────────────────────────────────
