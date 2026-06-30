@@ -1,12 +1,10 @@
 // =============================================================================
-// mod.cpp — Taskbar Button Customizer (Windhawk Mod)
-// Main entry point: Windhawk metadata, settings schema, and lifecycle hooks.
+// taskbar-button-customizer.wh.cpp — SINGLE-FILE VERSION FOR WINDHAWK
+// This file includes all implementation .cpp files so Windhawk's single-TU
+// compiler sees the complete translation unit.
 //
-// Windhawk calls:
-//   Wh_ModInit()           — on load; install hooks, initial apply
-//   Wh_ModUninit()         — on unload; remove hooks, restore defaults
-//   Wh_ModSettingsChanged()— when the user saves a settings change; re-apply
-//   Wh_ModBeforeUninit()   — (optional) before uninit; no action needed here
+// The src/ headers are still the canonical source of truth for declarations.
+// The .cpp files are included here as implementation units.
 // =============================================================================
 
 // ==WindhawkMod==
@@ -170,7 +168,11 @@ License: MIT
 */
 // ==/WindhawkModSettings==
 
-// ─── Implementation headers ───────────────────────────────────────────────────
+// =============================================================================
+// IMPLEMENTATION — included in declaration order (dependencies first)
+// =============================================================================
+
+// Headers (declarations only — no ODR-violating definitions)
 #include "src/logger.h"
 #include "src/version_compat.h"
 #include "src/settings.h"
@@ -180,20 +182,27 @@ License: MIT
 #include "src/hooks.h"
 #include "src/live_refresh.h"
 
+// Implementation units (each included exactly once here)
+#include "src/settings.cpp"
+#include "src/property_engine.cpp"
+#include "src/taskbar_discovery.cpp"
+#include "src/hooks.cpp"
+#include "src/live_refresh.cpp"
+
 #include <windhawk_api.h>
 #include <windows.h>
 #include <atomic>
 
-// ─── Module-level state ───────────────────────────────────────────────────────
+// =============================================================================
+// MODULE STATE
+// =============================================================================
 
 namespace {
 
 /// True once Wh_ModInit has succeeded and the mod is fully active.
 std::atomic<bool> g_modActive { false };
 
-/// Current settings snapshot (updated atomically on settings change).
-/// Access under g_settingsMutex for writes; reads in Apply are done after
-/// the mutex in LiveRefreshManager::ApplyNow which is always on the UI thread.
+/// Placeholder for the current settings snapshot.
 TaskbarCustomizer::ModSettings g_currentSettings;
 
 // ─── Internal callbacks (called from hooks) ───────────────────────────────────
@@ -210,28 +219,29 @@ void OnTaskbarUpdated(HWND /*hwnd*/) {
 
 } // anonymous namespace
 
-// ─── Windhawk entry points ────────────────────────────────────────────────────
+// =============================================================================
+// WINDHAWK ENTRY POINTS
+// =============================================================================
 
 /// Called by Windhawk when the mod is loaded into Explorer.exe.
 BOOL Wh_ModInit() {
     LOG_INFO(L"[Mod] Wh_ModInit start.");
 
-    // ── Step 1: OS version check ─────────────────────────────────────────────
+    // Step 1: OS version check
     if (!TaskbarCustomizer::IsOsVersionSupported()) {
         LOG_ERROR(L"[Mod] Unsupported OS version. Mod will not load.");
-        return FALSE; // Signal Windhawk to not proceed with this mod.
+        return FALSE;
     }
 
-    // ── Step 2: Initialize the live-refresh subsystem ────────────────────────
+    // Step 2: Initialize live-refresh subsystem
     if (!TaskbarCustomizer::LiveRefreshManager::Initialize()) {
         LOG_ERROR(L"[Mod] Failed to initialize LiveRefreshManager.");
         return FALSE;
     }
 
-    // ── Step 3: Register the discovery callback for new buttons ──────────────
+    // Step 3: Register callback for newly discovered buttons
     TaskbarCustomizer::TaskbarDiscovery::SetButtonFoundCallback(
-        [](TaskbarCustomizer::winrt::Windows::UI::Xaml::DependencyObject btn) {
-            // A new button appeared — load current settings and apply
+        [](winrt::Windows::UI::Xaml::DependencyObject btn) {
             TaskbarCustomizer::ValidationResult vr;
             auto s = TaskbarCustomizer::SettingsManager::LoadAndValidate(vr);
             if (!s.profile.empty() && s.profile != L"Custom") {
@@ -240,15 +250,12 @@ BOOL Wh_ModInit() {
             TaskbarCustomizer::PropertyEngine::ApplyToButtonSubtree(btn, s);
         });
 
-    // ── Step 4: Install Win32 API hooks ──────────────────────────────────────
-    if (!TaskbarCustomizer::ExplorerHooks::Install(
-            OnTaskbarCreated, OnTaskbarUpdated))
-    {
+    // Step 4: Install Win32 API hooks
+    if (!TaskbarCustomizer::ExplorerHooks::Install(OnTaskbarCreated, OnTaskbarUpdated)) {
         LOG_WARN(L"[Mod] Some hooks failed; mod may not fully function.");
-        // Non-fatal — we still try an immediate apply below.
     }
 
-    // ── Step 5: Immediate apply (taskbar may already be running) ─────────────
+    // Step 5: Immediate apply (taskbar may already be running)
     TaskbarCustomizer::LiveRefreshManager::RequestRefresh();
 
     g_modActive.store(true, std::memory_order_release);
@@ -262,10 +269,9 @@ void Wh_ModUninit() {
 
     g_modActive.store(false, std::memory_order_release);
 
-    // ── Remove hooks ─────────────────────────────────────────────────────────
     TaskbarCustomizer::ExplorerHooks::Uninstall();
 
-    // ── Restore defaults on all discovered buttons ────────────────────────────
+    // Restore all buttons to Windows defaults
     auto elements = TaskbarCustomizer::TaskbarDiscovery::DiscoverAll();
     if (elements.has_value()) {
         for (auto& btn : elements->taskListButtons) {
@@ -275,16 +281,13 @@ void Wh_ModUninit() {
                  elements->taskListButtons.size());
     }
 
-    // ── Shut down live refresh ────────────────────────────────────────────────
     TaskbarCustomizer::LiveRefreshManager::Shutdown();
-
     LOG_INFO(L"[Mod] Wh_ModUninit complete.");
 }
 
-/// Called by Windhawk when the user saves new settings in the UI panel.
+/// Called by Windhawk when the user saves new settings.
 void Wh_ModSettingsChanged() {
     if (!g_modActive.load(std::memory_order_acquire)) return;
-
     LOG_INFO(L"[Mod] Settings changed; requesting refresh.");
     TaskbarCustomizer::LiveRefreshManager::RequestRefresh();
 }
