@@ -219,6 +219,10 @@ using winrt::Windows::UI::Xaml::Media::VisualTreeHelper;
         _snwprintf_s(_buf_, _countof(_buf_), _TRUNCATE,            \
                      prefix L" " fmt, ##__VA_ARGS__);              \
         Wh_Log(L"%ls", _buf_);                                      \
+        wchar_t _dbgBuf_[1050];                                     \
+        _snwprintf_s(_dbgBuf_, _countof(_dbgBuf_), _TRUNCATE,       \
+                     L"TBC: %ls\n", _buf_);                         \
+        ::OutputDebugStringW(_dbgBuf_);                             \
     } while(0)
 
 #if TBC_LOG_LEVEL <= TBC_LOG_DEBUG
