@@ -727,13 +727,14 @@ static DWORD WINAPI XamlDiagThread(LPVOID) {
         return 1;
     }
 
+    const GUID IID_IXamlDiagnostics_Local = { 0x18C9E2B6, 0x3F43, 0x4116, { 0x9F, 0x2B, 0xFF, 0x93, 0x5D, 0x77, 0x70, 0xD2 } };
     IXamlDiagnostics* rawDiag = nullptr;
     HRESULT hr = initFn(
         L"VisualDiagConnection1",
         ::GetCurrentProcessId(),
         nullptr,              // no separate dll
         L"",                  // package name
-        IID_IXamlDiagnostics,
+        IID_IXamlDiagnostics_Local,
         reinterpret_cast<void**>(&rawDiag));
 
     if (FAILED(hr) || !rawDiag) {
