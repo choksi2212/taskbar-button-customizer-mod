@@ -1,0 +1,51 @@
+# .gitignore — Windows 11 Taskbar Button Customizer
+
+# ── Compiled binaries ────────────────────────────────────────────────────────
+*.dll
+*.exe
+*.obj
+*.pdb
+*.lib
+*.exp
+*.ilk
+*.map
+
+# ── Visual Studio ────────────────────────────────────────────────────────────
+.vs/
+*.vcxproj.user
+*.suo
+*.sln.docstates
+out/
+Debug/
+Release/
+x64/
+ipch/
+*.VC.db
+*.VC.opendb
+
+# ── CMake ────────────────────────────────────────────────────────────────────
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+build/
+
+# ── Windhawk compiler output ─────────────────────────────────────────────────
+*.wh.pdb
+*.wh.dll
+
+# ── OS ───────────────────────────────────────────────────────────────────────
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# ── Editor ───────────────────────────────────────────────────────────────────
+*.swp
+*.swo
+*~
+.vscode/settings.json
+.idea/
+
+# ── Temporary ────────────────────────────────────────────────────────────────
+*.tmp
+*.log
+*.bak
